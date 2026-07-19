@@ -9,8 +9,8 @@ y = [];
 for j = 1:c 
     center = zeros(1, d); 
     center(j) = 4;
-    X = [X; randn(n_per_cluster, d) + center]; %#ok<AGROW>
-    y = [y; j * ones(n_per_cluster, 1)]; %#ok<AGROW>
+    X = [X; randn(n_per_cluster, d) + center];
+    y = [y; j * ones(n_per_cluster, 1)];
 end 
 
 A = make_knn_affinity(X, 7);
