@@ -19,7 +19,7 @@ opts.max_iter = 500;
 opts.seed = 1;
 opts.eta = 1;
 
-[pred, U, V, Lambda, history] = dsd2f_psg_fallback(A, c, opts); %#ok<ASGLU>
+[pred, U, V, Lambda, history] = dsd2f_psg_fallback(A, c, opts);
 fprintf('RI  = %.4f\n', rand_index_fast(y, pred));
 fprintf('NMI = %.4f\n', nmi_score(y, pred));
 fprintf('U unit-step acceptance = %.3f\n', history.unit_accept_rate_U);
