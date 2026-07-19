@@ -1,86 +1,39 @@
-# DSD2F MATLAB 代码
+# DSD2F MATLAB Code
 
-## 1. 与论文公式的对应关系
+## 1. Correspondence to the Paper’s Formulas
 
-主函数 `dsd2f_psg_fallback.m` 实现以下步骤：
+The main function `dsd2f_psg_fallback.m` implements the following steps:
 
-1. **U 的 scaled trial**
+1. **Scaled trial for U**  
    \[
    [U-\alpha\nabla_U\ell\,(M_U)^{-1}]_+.
    \]
-   程序默认先取 `alpha=1`。若下降检查不通过，最多缩小 5 次。
+   The code first tries `alpha=1`. If the descent check fails, it reduces α at most 5 times.
 
-2. **U 的 projected-gradient fallback**
+2. **Projected‑gradient fallback for U**  
    \[
    [U-t_U\nabla_U\ell]_+,\qquad t_U=\theta/L_U.
    \]
-   该步对应论文 Proposition 中的可证明下降界。
+   This step corresponds to the provable descent bound in the Proposition of the paper.
 
-3. **V 的 scaled trial 与 fallback**：处理方式完全相同。
+3. **Scaled trial and fallback for V**: handled in exactly the same way.
 
-4. **KKT-based 乘子更新**
+4. **KKT‑based multiplier update**  
    \[
    \Lambda=\operatorname{diag}\big([AV-UV^TV+\gamma(V-U)]U^T\big).
    \]
-   代码通过逐行内积计算，不形成 n×n 矩阵。
+   The code computes this via row‑wise inner products, without forming the n×n matrix.
 
-5. **gamma 保护**：
-   - `tau >= 1`，确保 gamma 不减小；
-   - `eps_tau` 防止分母过小；
-   - `gamma_max` 防止数值溢出。
+5. **Gamma protection**:
+   - `tau >= 1` ensures that gamma never decreases;
+   - `eps_tau` prevents division by too small a denominator;
+   - `gamma_max` avoids numerical overflow.
 
-6. **停止条件**：同时检查 U/V 相对变化和 row-sum residual，不再比较不同 Lambda、gamma 下的 Lagrangian 值。
+6. **Stopping criteria**: both relative changes of U/V and the row‑sum residual are checked; the Lagrangian value under different Lambda and gamma is no longer compared.
 
-## 2. 快速测试
+## 2. Quick Test
 
-在 MATLAB 中把本目录加入路径，然后运行：
+Add the current directory to the MATLAB path and run:
 
 matlab
 demo_synthetic
-
-## 3. 单数据集重复实验
-
-MAT 文件可包含：
-
-- `A`：已构造好的 affinity matrix；或
-- `X`：每行一个样本，程序据此构造 k-NN 图；
-- 标签变量名支持 `gnd`、`labels`、`y`、`truth`。
-
-## 4. r 与 k 敏感性实验
-
-matlab
-opts.runs = 10;
-opts.k_values = [5, 7, 10, 15];
-opts.rank_factors = [0.5, 0.75, 1, 1.25, 1.5];
-results = run_sensitivity_experiments('CITESEER.mat', ...
-    'results/CITESEER_sensitivity', opts);
-
-
-输出 `sensitivity_summary.csv`，包含 RI、NMI、CPU time、unit-step 接受率和 fallback 率。
-
-## 5. 正式重跑前需确认
-
-- `eta` 应与最终论文设定一致；当前默认值为 1。
-- 原论文中的 Tables 3--5 和 Figures 1--5 必须用这版代码重新生成。
-- 大数据集建议使用稀疏 `A`，避免保存稠密 n×n affinity matrix。
-- 当前环境没有 MATLAB/Octave，代码已进行静态检查，但正式实验前仍应先运行 `demo_synthetic.m`。
-
-## 6. 梯度与下降界自检
-
-matlab
-validate_gradients
-
-该脚本用有限差分检查 U/V 梯度，并验证 U-block fallback 的理论下降不等式。
-
-
-## 逐行中文注释版说明
-
-本目录中的每个 `.m` 文件均保留原算法语句，并对每一条非空 MATLAB 代码行添加中文行内说明。已有的中文注释保持不变。正式运行时无需删除这些注释。
-
-建议依次运行：
-
-matlab
-validate_gradients
-demo_synthetic
-
-确认梯度误差、fallback 下降检验和合成数据演示均正常后，再运行正式数据集脚本。
