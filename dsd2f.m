@@ -1,22 +1,12 @@
-function [labels, U, V, Lambda, history] = dsd2f_psg_fallback(A, r, opts)
-    if nargin < 3
-        opts = struct();
-    end
+function [labels, U, V, Lambda, history] = dsd2f(A, r, opts)
+    if nargin < 3, opts = struct(); end
     opts = local_defaults(opts);
 
     [n, m] = size(A);
-    if n ~= m
-        error('A must be square.');
-    end
-    if r < 1 || r ~= floor(r)
-        error('r must be a positive integer.');
-    end
-    if any(~isfinite(nonzeros(A)))
-        error('A contains NaN or Inf.');
-    end
-    if any(nonzeros(A) < 0)
-        error('A must be a nonnegative affinity matrix.');
-    end
+    if n ~= m, error('A must be square.'); end
+    if r < 1 || r ~= floor(r), error('r must be a positive integer.'); end
+    if any(~isfinite(nonzeros(A))), error('A contains NaN or Inf.'); end
+    if any(nonzeros(A) < 0), error('A must be a nonnegative affinity matrix.'); end
 
     one = ones(n, 1);
     Ir = eye(r);
@@ -32,18 +22,14 @@ function [labels, U, V, Lambda, history] = dsd2f_psg_fallback(A, r, opts)
     else
         V = max(opts.V0, 0);
     end
-    if ~isequal(size(U), [n, r]) || ~isequal(size(V), [n, r])
-        error('U0 and V0 must be n x r.');
-    end
-
     U = U + opts.init_floor;
     V = V + opts.init_floor;
     Lambda = zeros(n, 1);
     gamma = opts.gamma0;
 
     A_fro2 = full(sum(nonzeros(A).^2));
-
     T = opts.max_iter;
+
     history.model_obj = nan(T, 1);
     history.aug_obj_before_dual = nan(T, 1);
     history.row_residual = nan(T, 1);
@@ -76,51 +62,22 @@ function [labels, U, V, Lambda, history] = dsd2f_psg_fallback(A, r, opts)
         LU = max(real(LU), opts.min_curvature);
 
         alphaU = 1;
-        acceptedU = false;
-        U_trial = U;
-        L_Utrial = L_start;
+        U_candidate = max(U - alphaU * (gradU / MU), 0);
+        dU2 = norm(U_candidate - U, 'fro')^2;
+        L_candidate = dsd2f_augmented_value(A, A_fro2, U_candidate, V, Lambda, gamma, opts.eta);
 
-        for j = 1:opts.scaled_max_trials
-            U_candidate = max(U - alphaU * (gradU / MU), 0);
-            L_candidate = dsd2f_augmented_value( ...
-                A, A_fro2, U_candidate, V, Lambda, gamma, opts.eta);
-            dU2 = norm(U_candidate - U, 'fro')^2;
-
-            if L_candidate <= L_start - opts.armijo_c * dU2 + opts.numeric_tol
-                U_trial = U_candidate;
-                L_Utrial = L_candidate;
-                acceptedU = true;
-                break;
-            end
-            alphaU = alphaU * opts.beta;
-        end
-
-        if acceptedU
-            U = U_trial;
+        if L_candidate <= L_start - opts.armijo_c * dU2 + opts.numeric_tol
+            U = U_candidate;
+            acceptedU = true;
             history.alpha_U(k) = alphaU;
-            history.unit_accept_U(k) = abs(alphaU - 1) <= eps;
         else
             tU = opts.theta / LU;
-            U = max(U - tU * gradU, 0);
-            L_Utrial = dsd2f_augmented_value( ...
-                A, A_fro2, U, V, Lambda, gamma, opts.eta);
-
-            fallback_ok = L_Utrial <= L_start + opts.numeric_tol;
-            bt = 0;
-            while ~fallback_ok && bt < opts.fallback_max_trials
-                tU = tU * opts.beta;
-                U = max(U_old - tU * gradU, 0);
-                L_Utrial = dsd2f_augmented_value( ...
-                    A, A_fro2, U, V, Lambda, gamma, opts.eta);
-                fallback_ok = L_Utrial <= L_start + opts.numeric_tol;
-                bt = bt + 1;
-            end
-            if ~fallback_ok
-                error('U-block fallback failed to produce descent. Check numerical scaling or parameters.');
-            end
+            U = max(U_old - tU * gradU, 0);
+            acceptedU = false;
             history.alpha_U(k) = tU;
             history.fallback_U(k) = true;
         end
+        history.unit_accept_U(k) = acceptedU;
 
         R = U' * U;
         MV = (1 + opts.eta * n) * R + gamma * Ir;
@@ -134,53 +91,24 @@ function [labels, U, V, Lambda, history] = dsd2f_psg_fallback(A, r, opts)
         LV = (1 + opts.eta * n) * max(eig((R + R') / 2)) + gamma;
         LV = max(real(LV), opts.min_curvature);
 
-        L_after_U = L_Utrial;
+        L_after_U = dsd2f_augmented_value(A, A_fro2, U, V, Lambda, gamma, opts.eta);
         alphaV = 1;
-        acceptedV = false;
-        V_trial = V;
-        L_Vtrial = L_after_U;
+        V_candidate = max(V - alphaV * (gradV / MV), 0);
+        dV2 = norm(V_candidate - V, 'fro')^2;
+        L_candidate = dsd2f_augmented_value(A, A_fro2, U, V_candidate, Lambda, gamma, opts.eta);
 
-        for j = 1:opts.scaled_max_trials
-            V_candidate = max(V - alphaV * (gradV / MV), 0);
-            L_candidate = dsd2f_augmented_value( ...
-                A, A_fro2, U, V_candidate, Lambda, gamma, opts.eta);
-            dV2 = norm(V_candidate - V, 'fro')^2;
-
-            if L_candidate <= L_after_U - opts.armijo_c * dV2 + opts.numeric_tol
-                V_trial = V_candidate;
-                L_Vtrial = L_candidate;
-                acceptedV = true;
-                break;
-            end
-            alphaV = alphaV * opts.beta;
-        end
-
-        if acceptedV
-            V = V_trial;
+        if L_candidate <= L_after_U - opts.armijo_c * dV2 + opts.numeric_tol
+            V = V_candidate;
+            acceptedV = true;
             history.alpha_V(k) = alphaV;
-            history.unit_accept_V(k) = abs(alphaV - 1) <= eps;
         else
             tV = opts.theta / LV;
-            V = max(V - tV * gradV, 0);
-            L_Vtrial = dsd2f_augmented_value( ...
-                A, A_fro2, U, V, Lambda, gamma, opts.eta);
-
-            fallback_ok = L_Vtrial <= L_after_U + opts.numeric_tol;
-            bt = 0;
-            while ~fallback_ok && bt < opts.fallback_max_trials
-                tV = tV * opts.beta;
-                V = max(V_old - tV * gradV, 0);
-                L_Vtrial = dsd2f_augmented_value( ...
-                    A, A_fro2, U, V, Lambda, gamma, opts.eta);
-                fallback_ok = L_Vtrial <= L_after_U + opts.numeric_tol;
-                bt = bt + 1;
-            end
-            if ~fallback_ok
-                error('V-block fallback failed to produce descent. Check numerical scaling or parameters.');
-            end
+            V = max(V_old - tV * gradV, 0);
+            acceptedV = false;
             history.alpha_V(k) = tV;
             history.fallback_V(k) = true;
         end
+        history.unit_accept_V(k) = acceptedV;
 
         AV = A * V;
         VtV = V' * V;
@@ -200,7 +128,7 @@ function [labels, U, V, Lambda, history] = dsd2f_psg_fallback(A, r, opts)
         factor_res = norm(U - V, 'fro') / max(1, norm(U, 'fro') + norm(V, 'fro'));
 
         history.model_obj(k) = dsd2f_model_value(A, A_fro2, U, V, gamma);
-        history.aug_obj_before_dual(k) = L_Vtrial;
+        history.aug_obj_before_dual(k) = dsd2f_augmented_value(A, A_fro2, U, V, Lambda, gamma, opts.eta);
         history.row_residual(k) = feas;
         history.factor_residual(k) = factor_res;
         history.rel_U(k) = relU;
@@ -249,9 +177,9 @@ function opts = local_defaults(opts)
     defaults.max_iter = 3000;
     defaults.tol_step = 1e-4;
     defaults.tol_feas = 1e-4;
-    defaults.beta = 0.5;
-    defaults.scaled_max_trials = 5;
-    defaults.fallback_max_trials = 20;
+    defaults.beta = 0.5; 
+    defaults.scaled_max_trials = 1; 
+    defaults.fallback_max_trials = 1;
     defaults.theta = 0.95;
     defaults.armijo_c = 1e-8;
     defaults.numeric_tol = 1e-12;
