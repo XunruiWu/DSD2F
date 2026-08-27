@@ -1,0 +1,20 @@
+function summary = aggregate_dsd2f_table910(raw, cfg)
+%AGGREGATE_DSD2F_TABLE910 Aggregate the 30 V4 DSD2F runs per dataset.
+
+    nD = numel(cfg.datasets);
+    out = cell(nD,9);
+    for d = 1:nD
+        name = cfg.datasets{d};
+        T = raw(strcmp(raw.Dataset,name),:);
+        if height(T) ~= numel(cfg.seeds)
+            error('%s: expected %d runs, found %d.', name, numel(cfg.seeds), height(T));
+        end
+        out(d,:) = {name,100*mean(T.RI),100*std(T.RI), ...
+            mean(T.SolverTime),std(T.SolverTime),mean(T.Iterations), ...
+            median(T.FinalGamma),median(T.FinalBalancedRowResidual),height(T)};
+    end
+    summary = cell2table(out, 'VariableNames', ...
+        {'Dataset','RI_mean_percent','RI_std_percent','SolverTime_mean_s', ...
+         'SolverTime_std_s','Iterations_mean','FinalGamma_median', ...
+         'FinalBalancedRowResidual_median','Runs'});
+end
