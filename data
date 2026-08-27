@@ -1,0 +1,25 @@
+# Data format
+
+The public code archive intentionally does not redistribute benchmark datasets.
+To reproduce the DSD2F entries of Tables 9 and 10, place the prepared MATLAB
+files in this directory using these names:
+
+- `20NEWS.mat`    (`n=18846`, `r=20`)
+- `CANCER.mat`    (`n=190`, `r=14`)
+- `CITESEER.mat`  (`n=3312`, `r=6`)
+- `FOOTBALL.mat`  (`n=115`, `r=12`)
+- `ORL.mat`       (`n=400`, `r=40`)
+- `PROTEIN.mat`   (`n=17766`, `r=3`)
+- `REUTERS.mat`   (`n=8293`, `r=65`)
+- `SEG.mat`       (`n=2310`, `r=7`)
+- `SPAM.mat`      (`n=4601`, `r=2`)
+- `UMIST.mat`     (`n=575`, `r=20`)
+
+Each file must contain:
+
+- `A`: the prepared nonnegative symmetric affinity matrix;
+- `gnd`: the ground-truth class labels, used only after optimization to compute RI.
+
+The Table 9/10 rerun used the cleaned R2 data preparation (for example,
+20NEWS has 18,846 samples and CANCER has 190 samples). It is a separate
+rerun from the historical experiment reported earlier in the manuscript.
